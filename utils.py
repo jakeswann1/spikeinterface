@@ -1,6 +1,7 @@
 def generate_tetrodes(n):
     import numpy as np
     from probeinterface import generate_tetrode, ProbeGroup
+    from probeinterface import write_prb
     
     probegroup = ProbeGroup()
     for i in range(n):
