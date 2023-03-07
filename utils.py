@@ -98,13 +98,18 @@ def sort(recording, recording_name, base_folder, electrode_type, sorting_suffix)
         print(f"Sorting loaded from file {sorting_path}")
 
     else:
-        sorting = ss.run_sorter(sorter, recording, output_folder=f"{sorting_path}",
-                                verbose = True, docker_image = True)#, **custom_sorter_params())
-        sorting = sorting.remove_empty_units()
+        if sorter == 'klusta' or 'kilosort' in sorter == True:
+            sorting = ss.run_sorter(sorter, recording, output_folder=f"{sorting_path}",
+                                    verbose = True, docker_image = True)#, **custom_sorter_params())
+            sorting = sorting.remove_empty_units()
 
-        print('\nSorting Complete\n', sorting, '\nKlusta found', len(sorting.get_unit_ids()), 'non-empty units')
-        sorting_saved = sorting.save(folder=sorting_path / 'sort')
-        print(f'Sorting saved to {sorting_path}/sort')
+            print('\nSorting Complete\n', sorting, '\nKlusta found', len(sorting.get_unit_ids()), 'non-empty units')
+            sorting_saved = sorting.save(folder=sorting_path / 'sort')
+            print(f'Sorting saved to {sorting_path}/sort')
+        
+        #Run non-phy integraded sorter on individual tetrodes
+        else:
+            
 
     print(sorting)
     #raster = si.widgets.plot_rasters(sorting)
