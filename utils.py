@@ -1,7 +1,7 @@
 def custom_sorter_params():
     custom_sorter_params = {'adjacency_radius': None,
-                 'threshold_strong_std_factor': 4,
-                 'threshold_weak_std_factor': 1.5,
+                 'threshold_strong_std_factor': 5,
+                 'threshold_weak_std_factor': 2,
                  'detect_sign': -1,
                  'extract_s_before': 16,
                  'extract_s_after': 32,
@@ -18,6 +18,8 @@ def custom_sorter_params():
     return custom_sorter_params
 
 def generate_tetrodes(n):
+    # Returns a spikeinterface ProbeGroup object with n tetrodes spaced 300um apart vertically
+    
     import numpy as np
     from probeinterface import generate_tetrode, ProbeGroup
     from probeinterface import write_prb
@@ -25,7 +27,7 @@ def generate_tetrodes(n):
     probegroup = ProbeGroup()
     for i in range(n):
         tetrode = generate_tetrode()
-        tetrode.move([0, i * 200])
+        tetrode.move([0, i * 300])
         tetrode.set_device_channel_indices(np.arange(i*4, i*4+4))
         probegroup.add_probe(tetrode)
     
@@ -34,7 +36,10 @@ def generate_tetrodes(n):
     plot_probe_group(probegroup, with_channel_index = True)
     return probegroup
 
-def preprocess(recording, recording_name, base_folder, electrode_type):
+def preprocess(recording, recording_name, base_folder, electrode_type, num_channels):
+    # Adds a Probe object to a Spikeinterface recording object
+    # Cuts the recording to 'num_channels' channels
+    # Saves the recording to a preprocessing folder
     
     from probeinterface import read_prb
     from probeinterface.plotting import plot_probe, plot_probe_group
@@ -44,7 +49,7 @@ def preprocess(recording, recording_name, base_folder, electrode_type):
     
     preprocessing_folder = Path(f'{base_folder}/{recording_name}_preprocessed')
 
-    if electrode_type == 'tetrode':
+    if electrode_type == 'tetrode' or electrode_type == '8_tetrode':
         probe = read_prb('/home/isabella/Documents/isabella/klusta_testdata/spikeinterface/8_tetrodes.prb') #Load probe
     elif electrode_type == 'probe' or electrode_type == '32 ch four shanks':
         probe = read_prb('/home/isabella/Documents/isabella/klusta_testdata/spikeinterface/4x8_buzsaki_oneshank.prb') #Load probe
@@ -62,7 +67,7 @@ def preprocess(recording, recording_name, base_folder, electrode_type):
         return recording
     else:
         channel_ids = recording.get_channel_ids()
-        recording = recording.channel_slice(channel_ids=channel_ids[:32]) #Cut out empty channels 33-64
+        recording = recording.channel_slice(channel_ids=channel_ids[:num_channels]) #Cut to correct number of channels
 
         ## Currently necessary as the probe is being treated as a single shank
         ## This turns the probe object from ProbeGroup to Probe
@@ -74,11 +79,17 @@ def preprocess(recording, recording_name, base_folder, electrode_type):
         return recording
     
 
-def sort(recording, recording_name, base_folder, sorting_suffix):
+def sort(recording, recording_name, base_folder, electrode_type, sorting_suffix):
+    # Takes a preprocessed Spikeinterface recording object, and sorts using Klusta
     
     from pathlib import Path
     import spikeinterface as si
     import spikeinterface.sorters as ss
+    
+    if electrode_type == 'tetrode':
+        sorter = 'mountainsort4'
+    else:
+        sorter = 'klusta'
     
     sorting_path = Path(f'{base_folder}/{recording_name}_{sorting_suffix}') # Can be changed if you want to hold on to multiple sorts
 
@@ -87,8 +98,8 @@ def sort(recording, recording_name, base_folder, sorting_suffix):
         print(f"Sorting loaded from file {sorting_path}")
 
     else:
-        sorting = ss.run_sorter('klusta', recording, output_folder=f"{sorting_path}",
-                                verbose = True, docker_image = False, **custom_sorter_params())
+        sorting = ss.run_sorter(sorter, recording, output_folder=f"{sorting_path}",
+                                verbose = True, docker_image = True)#, **custom_sorter_params())
         sorting = sorting.remove_empty_units()
 
         print('\nSorting Complete\n', sorting, '\nKlusta found', len(sorting.get_unit_ids()), 'non-empty units')
@@ -97,3 +108,13 @@ def sort(recording, recording_name, base_folder, sorting_suffix):
 
     print(sorting)
     #raster = si.widgets.plot_rasters(sorting)
+    
+def get_mode(set_file):
+    # Gets recording mode from channel 0 in set file
+    # Assumes all channels are recorded in the same mode
+    
+    f = open(set_file, 'r')
+    mode = f.readlines()[14][10]
+    return mode
+    
+    
