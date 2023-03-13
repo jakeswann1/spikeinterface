@@ -19,8 +19,8 @@ def custom_tetrode_params():
 
 def custom_probe_params():
     custom_klusta_params = {'adjacency_radius': None,
-                 'threshold_strong_std_factor': 6,
-                 'threshold_weak_std_factor': 4,
+                 'threshold_strong_std_factor': 5,
+                 'threshold_weak_std_factor': 2,
                  'detect_sign': -1,
                  'extract_s_before': 16,
                  'extract_s_after': 32,
@@ -70,7 +70,7 @@ def preprocess(recording, recording_name, base_folder, electrode_type, num_chann
 
     if electrode_type == 'tetrode' or electrode_type == '8_tetrode':
 #         probe = read_prb('/home/isabella/Documents/isabella/klusta_testdata/spikeinterface/8_tetrodes.prb') #Load probe
-        probe = generate_tetrodes(num_channels/4)
+        probe = generate_tetrodes(int(num_channels/4))
         
     elif electrode_type == 'probe' or electrode_type == '32 ch four shanks':
         probe = read_prb('/home/isabella/Documents/isabella/klusta_testdata/spikeinterface/4x8_buzsaki_oneshank.prb') #Load probe
@@ -111,7 +111,6 @@ def sort(recording, recording_name, base_folder, electrode_type, sorting_suffix)
     import spikeinterface.sorters as ss
     
 #     recordings = recording.split_by(property='group', outputs='dict')
-    recordings = {0:recording}
     
     if electrode_type == 'tetrode':
         sorter_params = custom_tetrode_params()
@@ -120,7 +119,8 @@ def sort(recording, recording_name, base_folder, electrode_type, sorting_suffix)
         sorter_params = custom_probe_params()
         sorter = 'klusta'
     
-    sorting_path = Path(f'{base_folder}/{recording_name}_{sorting_suffix}') # Can be changed if you want to hold on to multiple sorts
+    sorting_path = Path(f'{base_folder}/{recording_name}_{sorting_suffix}') 
+    # Can be changed if you want to hold on to multiple sorts
     
 
     if (sorting_path).is_dir():
@@ -128,43 +128,29 @@ def sort(recording, recording_name, base_folder, electrode_type, sorting_suffix)
         print(f"Sorting loaded from file {sorting_path}")
 
     else:
+        sortings = []
         if electrode_type == 'tetrode':
-            sortings = []
-            for group, sub_recording in recordings.items():
-                sorting = ss.run_sorter('klusta', sub_recording, output_folder=f'{sorting_path}',
-                                        verbose = True, docker_image = False, **custom_tetrode_params())
-                sorting = sorting.remove_empty_units()
-                sortings.append(sorting)
-                print(f'(Sub)recording {group} sorted!\n Klusta found {len(sorting.get_unit_ids())} units\n {sub_recording}')
-            sortings = si.aggregate_units(sortings)
-            
-            print('\nSorting Complete\n', sortings)
-            sortings_saved = sorting.save(folder=sorting_path / 'sort')
-            print(f'Sorting saved to {sorting_path}/sort \n Klusta found {len(sorting.get_unit_ids())} units')
+        # Run klusta on tetrode recording using custom_tetrode_params above
+            sorting = ss.run_sorter('klusta', recording, output_folder=f'{sorting_path}',
+                        verbose = True, docker_image = False, **custom_tetrode_params())
+ 
         elif electrode_type == 'probe' or electrode_type == '32 ch four shanks':
-            sortings = []
-            for group, sub_recording in recordings.items():
-                sorting = ss.run_sorter('klusta', sub_recording, output_folder=f'{sorting_path}/{group}',
-                                        verbose = True, docker_image = False, **custom_probe_params())
-                sorting = sorting.remove_empty_units()
-                sortings.append(sorting)
-                print(f'(Sub)recording {group} sorted!\n Klusta found {len(sorting.get_unit_ids())} units\n {sub_recording}')
-            sortings = si.aggregate_units(sortings)
+        # Run klusta on probe recording using custom_tetrode_params above
+            sorting = ss.run_sorter('klusta', recording, output_folder=f'{sorting_path}/{group}',
+                                    verbose = True, docker_image = False, **custom_probe_params())
+            
         else:
             print('Tetrode type set wrong')
+        
+        print(f'Recording sorted!\n Klusta found {len(sorting.get_unit_ids())} units\n {recording}')
+        sorting = sorting.remove_empty_units()
+        sortings.append(sorting)
+        sortings = si.aggregate_units(sortings)    
+        print('\nSorting Complete\n', sortings)
+        sortings_saved = sorting.save(folder=sorting_path / 'sort')
+        print(f'Sorting saved to {sorting_path}/sort \n Klusta found {len(sorting.get_unit_ids())} units')
             
-            print('\nSorting Complete\n', sortings)
-            sortings_saved = sorting.save(folder=sorting_path / 'sort')
-            print(f'Sorting saved to {sorting_path}/sort \n Klusta found {len(sorting.get_unit_ids())} units')
-            
-#         elif 'kilosort' in sorter == True:
-#             sorting = ss.run_sorter(sorter, recording, output_folder=f"{sorting_path}",
-#                                     verbose = True, docker_image = True)
-#             sorting = sorting.remove_empty_units()
 
-#             print('\nSorting Complete\n', sorting, '\nKilosort found', len(sorting.get_unit_ids()), 'non-empty units')
-#             sorting_saved = sorting.save(folder=sorting_path / 'sort')
-#             print(f'Sorting saved to {sorting_path}/sort')
 
     #raster = si.widgets.plot_rasters(sorting)
     
